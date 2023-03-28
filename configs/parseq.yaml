@@ -1,0 +1,45 @@
+data:
+  train_txt: ""
+  val_txt: ""
+  test_txt: ""
+  charset_train: "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
+  charset_test: "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  normalize_unicode: true
+  remove_whitespace: true
+  num_workers: 4
+  image_size: ${model.image_size}
+  batch_size: ${model.batch_size}
+
+model:
+  image_size: [32, 128]
+  patch_size: [4, 8]
+  max_label_length: 25
+  batch_size: 8
+  epochs: 20
+  embed_dim: 384
+  perm_num: 6
+  perm_forward: true
+  perm_mirror: true
+  decode_ar: true
+  refine_iters: 1
+  encoder:
+    num_heads: 6
+    mlp_ratio: 4.
+    depth: 12
+    drop_rate: ${hypermeters.drop_rate}
+    attn_drop_rate: 0.
+    drop_path_rate: 0.
+    qkv_bias: True
+  decoder: 
+    num_heads: 12
+    mlp_ratio: 4.
+    depth: 1
+    drop_rate: ${hypermeters.drop_rate}
+    norm: "layernorm"
+    activation: "gelu"
+
+hypermeters:
+  lr: 7e-4
+  weight_decay: 0.0
+  warmup_pct: 0.075
+  drop_rate: 0.1
