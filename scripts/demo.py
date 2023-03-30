@@ -1,40 +1,84 @@
-import math
+import argparse
+import warnings
 
 import torch
+from omegaconf import OmegaConf
 from PIL import Image
-from torchvision import transforms
+from torchvision import transforms as T
 
-from ocrpack.models.text_recog.backbones.vit import VisionTransformer
+from ocrpack.models.text_recog.architectures import PARSeq
 
-IMAGENET_DEFAULT_MEAN = (0.485, 0.456, 0.406)
-IMAGENET_DEFAULT_STD = (0.229, 0.224, 0.225)
-IMAGE_SIZE = 224
-SCALE_SIZE = int(math.floor(IMAGE_SIZE / 0.875))
+warnings.filterwarnings(action="ignore")
 
-model = VisionTransformer()
-model.load_state_dict(torch.load("./pretrained_weights/vit_base_16_224.pt"))
-model.eval()
+def get_args() -> argparse.Namespace:
+    arg_parser = argparse.ArgumentParser(description="OCR")
+    arg_parser.add_argument(
+        "-c", "--config", 
+        type=str, default="./configs/parseq.yaml", 
+        help="Path to the model config file"
+    )
+    arg_parser.add_argument(
+        "-w", "--weight", 
+        type=str, default="./weights/parseq.pt",
+        help="Path to the model weight file"
+    )
+    arg_parser.add_argument(
+        "-i", "--image",
+        type=str, default="./assets/test.jpg",
+        help="Path to the image file"
+    )
 
-filename = "./assets/dog.jpg"
-img = Image.open(filename).convert('RGB')
-transform = transforms.Compose([
-    transforms.Resize(SCALE_SIZE, interpolation=transforms.functional.InterpolationMode.BICUBIC),
-    transforms.CenterCrop(IMAGE_SIZE),
-    transforms.ToTensor(),
-    transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD),
-])
-tensor = transform(img).unsqueeze(0)  # transform and add batch dimension
+    args = arg_parser.parse_args()
+    return args
 
-with torch.no_grad():
-    out = model(tensor)
-probabilities = torch.nn.functional.softmax(out[0], dim=0)
-print(probabilities.shape)
+def main():
+    opts = get_args()
 
-# Get imagenet class mappings
-with open("./assets/imagenet_classes.txt", "r") as f:
-    categories = [s.strip() for s in f.readlines()]
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    cfg = OmegaConf.load(opts.config)
+    
+    # Model Initialization
+    parseq = PARSeq(cfg.data, cfg.model, cfg.hypermeters)
+    parseq.load_state_dict(torch.load(opts.weight))
+    parseq.eval()
+    parseq.to(device)
 
-# Print top categories per image
-top5_prob, top5_catid = torch.topk(probabilities, 5)
-for i in range(top5_prob.size(0)):
-    print(categories[top5_catid[i]], top5_prob[i].item())
+    # Image PreProcessing
+    transforms = []
+    transforms.extend([
+        T.Resize(cfg.model.image_size, T.InterpolationMode.BICUBIC),
+        T.ToTensor(),
+        T.Normalize(0.5, 0.5)
+    ])
+    img_transform = T.Compose(transforms)
+
+    # Image Transformation
+    image = Image.open(opts.image).convert("RGB")
+    image = img_transform(image).unsqueeze(0)
+
+    # Inferencing
+    logits = parseq(image.to(device))
+    pred = logits.softmax(-1)
+    label, confidence = parseq.tokenizer.decode(pred)
+    word_score = float(confidence[0].cumprod(dim=0)[-1].detach().numpy())
+
+    # Result Generation
+    chars_print = "Characters: "
+    score_print = "Score     : "
+    
+    for letter, score in zip(label[0], confidence[0]):
+        chars_print += f"\t{letter}"
+        score_print += f"\t{round(float(score.detach().numpy()), 2)}"
+
+    total_print_len = (len(score_print) + (len(label[0]) * 4))
+
+    print("=" * total_print_len)
+    print(f"Decoded Label(Score): \t{label[0]}({round(word_score, 2)})")
+    print("=" * total_print_len)
+    print(chars_print)
+    print(score_print)
+    print("=" * total_print_len)
+
+
+if __name__ == "__main__":
+    main()
