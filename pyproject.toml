@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "ocrpack"
 version = "0.1.0"
-description = ""
+description = "SOTA Text Detection and Recognition Models Zoo"
 authors = ["ArkarPhyo <arkarphyo.akp1996@gmail.com>"]
 readme = "README.md"
 
