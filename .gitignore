@@ -56,3 +56,4 @@ MANIFEST
 *.pt
 data/my_dataset/*.png
 test.py
+*.lock
