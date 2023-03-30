@@ -1,7 +1,9 @@
 from typing import Optional
-import pytorch_lightning as pl
-from ocrpack.data.data_augment import BackgroundEffect, DefaultTransform, OCRAugmentPipeline
 
+import lightning.pytorch as pl
+
+from ocrpack.data.data_augment import (BackgroundEffect, DefaultTransform,
+                                       OCRAugmentPipeline)
 from ocrpack.data.datasets.simple_dataset import SimpleDataset
 
 

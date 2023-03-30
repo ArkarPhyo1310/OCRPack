@@ -331,8 +331,6 @@ class PARSeq(nn.Module):
 
 if __name__ == "__main__":
     from omegaconf import OmegaConf
-    from PIL import Image
-    from strhub.data.module import SceneTextDataModule
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     cfg = OmegaConf.load("./configs/parseq.yaml")
@@ -346,18 +344,4 @@ if __name__ == "__main__":
         parseq_sd[n] = parseq_hub_sd[o]
 
     parseq.load_state_dict(parseq_sd)
-    parseq.eval()
-    parseq.to(device)
-
-    print(f"Image Size: \t{parseq_hub.hparams.img_size}")
-    img_transform = SceneTextDataModule.get_transform(parseq_hub.hparams.img_size)
-
-    image = Image.open("./assets/test.jpg").convert("RGB")
-    image = img_transform(image).unsqueeze(0)
-
-    logits = parseq(image.to(device))
-    print(logits.shape)
-
-    pred = logits.softmax(-1)
-    label, confidence = parseq.tokenizer.decode(pred)
-    print(f"Decoded Label: \t{label[0]}")
+    torch.save(parseq.half().state_dict(), "parseq.pt")
