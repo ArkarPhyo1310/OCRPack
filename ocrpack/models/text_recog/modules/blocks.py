@@ -181,3 +181,50 @@ class AttentionBlock(nn.Module):
         x = self.proj_drop(x)
 
         return x
+
+
+class SubSample(nn.Module):
+    def __init__(
+        self,
+        in_chs: int,
+        out_chs: int,
+        stride: list[int, int] = [2, 1],
+        norm: str = "layernorm",
+        act: str = None,
+        apply_pool: bool = True,
+    ) -> None:
+        super().__init__()
+        self.apply_pool = apply_pool
+        if apply_pool:
+            self.avg_pool = nn.AvgPool2d(
+                kernel_size=[3, 5], stride=stride, padding=[1, 2]
+            )
+            self.max_pool = nn.MaxPool2d(
+                kernel_size=[3, 5], stride=stride, padding=[1, 2]
+            )
+            self.proj = nn.Linear(in_chs, out_chs)
+        else:
+            self.conv = nn.Conv2d(
+                in_chs, out_chs,
+                kernel_size=3, stride=stride,
+                padding=1
+            )
+
+        self.norm = get_norm_layer(norm)(out_chs)
+        self.act = get_act_layer(norm)
+
+    def forward(self, x: Tensor) -> Tensor:
+        if self.apply_pool:
+            x1 = self.avg_pool(x)
+            x2 = self.max_pool(x1)
+            x = (x1 + x2) * 0.5
+            out = self.proj(x.flatten(2).transpose((0, 2, 1)))
+        else:
+            x = self.conv(x)
+            out = x.flatten(2).transpose((0, 2, 1))
+        if self.norm:
+            out = self.norm(out)
+
+        out = self.act(out)
+        return out
+
